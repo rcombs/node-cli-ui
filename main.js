@@ -1,16 +1,36 @@
 #!/usr/bin/env node
 const VERSION = "0.1.0";
+var path = require("path");
+var fs = require("fs");
 if(!exports){
     exports = {};
 }
-var readline = require("readline").createInterface(process.stdin,process.stdout);
+function completer(text){
+    var commandList = Object.keys(commands);
+    var completions = [];
+    for(var i = 0; i < commandList.length; i++){
+        if(commandList[i].indexOf(text) == 0){
+            completions.push(commandList[i]);
+        }
+    }
+    return [completions,text];
+}
+var readline = require("readline").createInterface(process.stdin,process.stdout,completer);
+readline.finished = function(){
+    this.history = this.oldHistory;
+    if(options.historyFile){
+        fs.writeFile(options.historyFile,this.history.join("\n"));
+    }
+    this.prompt();
+}
 var options = {
     programName: "",
     programVersion: "",
     promptCharacter: "$ "
 };
 var global = {
-    readline: readline
+    readline: readline,
+    runCommand: parseCommand
 };
 var commands = {
     help: {    
@@ -52,10 +72,14 @@ function parseCommand(command){
         if(commands[argv[0]].alias){
             parseCommand(commands[argv[0]].alias);
         }else{
-            commands[argv[0]].function.apply(global,argv.slice(1));
+            readline.oldHistory = readline.history.concat();
+            var ret = commands[argv[0]].function.apply(global,argv.slice(1));
         }
+    }else if(argv[0] == ""){
+        readline.prompt();
     }else{
-        process.stdout.write("No such command!");
+        console.log("No such command!");
+        readline.prompt();
     }
 }
 function listenForCommand(){
@@ -64,6 +88,22 @@ function listenForCommand(){
     readline.on("line",function(line){
         parseCommand(line);
     });
+}
+exports.setHistoryFile = function(filename){
+    if(!filename){
+        throw new Error("No filename!");
+    }
+    filename = filename.replace("~",process.env.HOME);
+    options.historyFile = filename;
+    if(!path.existsSync(filename)){
+        fs.writeFileSync(filename,"");
+        return;
+    }
+    var history = fs.readFileSync(filename,"utf8");
+    if(!history){
+        return;
+    }
+    readline.history = history.split("\n");
 }
 exports.setOptions = function(optionsArr){
     for(var i in optionsArr){
