@@ -95,7 +95,7 @@ exports.setHistoryFile = function(filename){
     }
     filename = filename.replace("~",process.env.HOME);
     options.historyFile = filename;
-    if(!path.existsSync(filename)){
+    if(!fs.existsSync(filename)){
         fs.writeFileSync(filename,"");
         return;
     }
